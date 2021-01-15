@@ -350,14 +350,14 @@ function parseKQ(html) {
 
 	// Print 刷卡 data
 	console.log(`/Department  /EID  /Name  /Clock Time`)
-	let n1
+	let n1 // 存放上一条数据信息，判断是否相同
 	while (true) {
 		let rex = new RegExp(
 			'<td>(.*?)</td><td>&nbsp;</td><td><.*?>(.*?)</a></td><td>(.*?)</td><td>.*?</td><td>(.*?)</td>',
 			'g'
 		) // NOTE: 'g' is important
-		let m = rex.exec(html)
-		let n = _dataStackOfDateTime.pop() || undefined
+		let m = rex.exec(html) // 获取当前数据的信息
+		let n = _dataStackOfDateTime.pop() || undefined // 从栈中获取数据
 		if (m) {
 			let time1 = moment(m[4], 'M/D/YYYY H:mm:ss')
 			let dateArr = time1.toArray()
@@ -368,7 +368,7 @@ function parseKQ(html) {
 			let t2 = moment(`${date} ${leavearriveCom}`, 'YYYY/MM/D H:mm:ss') // 下班时间
 			if (n) {
 				let time2 = moment(n[4], 'M/D/YYYY H:mm:ss')
-				if (time2.diff(time1, 'days') === 0) {
+				if (time2.isSame(time1, 'days')) {
 					if (time2.diff(time1, 'hours') < 9) {
 						m.push('工时不足')
 					}
@@ -393,25 +393,16 @@ function parseKQ(html) {
 					}
 				}
 			}
-
-			console.log(time1.diff(t1, 'minutes'), time1.diff(t2, 'minutes'))
-			console.log(
-				time1.diff(t1, 'minutes') < 0 || time1.diff(t2, 'minutes') > 0
-			)
 			if (
-				!(
-					time1.diff(t1, 'minutes') <= 0 ||
-					time1.diff(t2, 'minutes') >= 0
-				)
+				!(time1.isBefore(t1, 'minutes') || time1.isAfter(t2, 'minutes'))
 			) {
-				if (time1.diff(t1, 'minutes') > 0) {
+				if (time1.isAfter(t1, 'minutes')) {
 					m.push('今天迟到了')
-				} else if (time1.diff(t2, 'minutes') < 0) {
+				} else if (time1.isBefore(t2, 'minutes')) {
 					m.push('今天早退了')
 				}
 			}
 
-			console.log(`${m[1]} ${m[2]} ${m[3]} ${m[4]}`)
 			let str = ''
 			for (let i in m) {
 				if (i > 0) {
