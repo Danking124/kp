@@ -17,6 +17,8 @@ var _ASPNET_SessionId
 var _ASPNetRecycleSession
 var _accessDateArray = []
 var _accessArray = []
+var yesterday = null
+var dateFormat = 'YYYY-M-D'
 
 function openLoginPage() {
 	function callback(response) {
@@ -255,6 +257,7 @@ function inquire(beginDate, endDate, employeeIdOrName, nextPage, nextStep) {
 					)
 				} else {
 					console.log(`Inquiry about ${employeeIdOrName} is done.`)
+					yesterday = null
 					if (nextStep) {
 						// If provided.
 						nextStep()
@@ -369,15 +372,36 @@ function parseKQ(html) {
 				})
 			}
 			if (!_accessDateArray[str][date1]) {
-				_accessDateArray[str][date1] = {
-					dep: m[1],
-					id: m[2],
-					name: m[3],
-					time: [],
-					timeNum: 0,
-					status: '',
+				let flag = true
+				// 说明这个日期和前一日期不是同一天
+				// TODO 根据日期判断是否有缺少打卡的日期，如果有，则代表前一天直接放入，但内容的time的长度为0，则为请假
+				if (!yesterday) {
+					yesterday = moment(date1, dateFormat)
 				}
-				_accessArray[_accessArray.length - 1].date.push(date1)
+				while (flag) {
+					if (yesterday.isSame(moment(date1, dateFormat))) {
+						_accessDateArray[str][date1] = {
+							dep: m[1],
+							id: m[2],
+							name: m[3],
+							time: [],
+							timeNum: 0,
+							status: '',
+						}
+						_accessArray[_accessArray.length - 1].date.push(date1)
+						flag = false
+					} else {
+						_accessDateArray[str][yesterday.format(dateFormat)] = {
+							dep: m[1],
+							id: m[2],
+							name: m[3],
+							time: [],
+							timeNum: 0,
+							status: '',
+						}
+					}
+					addDate(yesterday)
+				}
 			}
 			_accessDateArray[str][date1].time.push(
 				`${time1.hour()}:${time1.minute()}:${time1.second()}`
@@ -403,22 +427,23 @@ function analysis() {
 			}
 			let Etime = moment(
 				`${da} ${date.time[date.time.length - 1]}`,
-				'YYYY-M-DD H/m/s'
+				'YYYY-M-D H/m/s'
 			)
-			let Ltime = moment(`${da} ${date.time[0]}`, 'YYYY-M-DD H/m/s')
+			let Ltime = moment(`${da} ${date.time[0]}`, 'YYYY-M-D H/m/s')
 			if (Ltime.diff(Etime, 'hours') < 9) {
 				date.status += '工时不足 '
 			}
-			if (
-				Ltime.isBefore(moment(`${da} 16:50:00`, 'YYYY-M-DD HH/mm/ss'))
-			) {
+			if (Ltime.isBefore(moment(`${da} 16:50:00`, 'YYYY-M-D HH/mm/ss'))) {
 				date.status += '下班早退'
 			}
-			if (Etime.isAfter(moment(`${da} 08:50:00`, 'YYYY-M-DD HH/mm/ss'))) {
+			if (Etime.isAfter(moment(`${da} 08:50:00`, 'YYYY-M-D HH/mm/ss'))) {
 				date.status += '上班迟到'
 			}
 			if (date.status.length == 0) {
 				date.status += 'OK'
+			}
+			if (date.time.length == 0) {
+				date.status = '请假'
 			}
 			date.Etime = Etime.format('HH:mm:SS')
 			date.Ltime = Ltime.format('HH:mm:SS')
@@ -444,6 +469,14 @@ function askAll() {
 			)
 		)
 	)
+}
+
+function addDate(date) {
+	if (date.isoWeekday() === 1) {
+		date = date.subtract(3, 'days')
+	} else {
+		date = date.subtract(1, 'days')
+	}
 }
 
 openLoginPage() // Where it all begins.
