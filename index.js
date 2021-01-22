@@ -9,14 +9,14 @@ const fs = require('fs') // NOTE: import default module
 const querystring = require('querystring') // NOTE: import default module
 const moment = require('moment')
 const { time } = require('console')
-const { months } = require('moment')
 
 //
 // Step 1: Open login page to get cookie 'ASP.NET_SessionId' and hidden input '_ASPNetRecycleSession'.
 //
 var _ASPNET_SessionId
 var _ASPNetRecycleSession
-var _dataStackOfDateTime = []
+var _accessDateArray = []
+var _accessArray = []
 
 function openLoginPage() {
 	function callback(response) {
@@ -254,7 +254,6 @@ function inquire(beginDate, endDate, employeeIdOrName, nextPage, nextStep) {
 						nextStep
 					)
 				} else {
-					_dataStackOfDateTime = []
 					console.log(`Inquiry about ${employeeIdOrName} is done.`)
 					if (nextStep) {
 						// If provided.
@@ -294,21 +293,23 @@ function inquire(beginDate, endDate, employeeIdOrName, nextPage, nextStep) {
 	}
 
 	let postData = querystring.stringify(postObj)
-	console.log('Once time')
-	let option = {
-		hostname: 'twhratsql.whq.wistron',
-		path: '/OGWeb/OGWebReport/EntryLogQueryForm.aspx',
-		method: 'POST',
-		headers: {
-			'User-Agent':
-				'Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 10.0; WOW64; Trident/7.0; .NET4.0C; .NET4.0E; .NET CLR 2.0.50727; .NET CLR 3.0.30729; .NET CLR 3.5.30729; MAARJS)', // mimic IE 11 // important
-			'X-MicrosoftAjax': 'Delta=true', // important
-			Cookie: `ASP.NET_SessionId=${_ASPNET_SessionId}; OGWeb=${OGWeb}`, // important
-			'Content-Type': 'application/x-www-form-urlencoded',
-			'Content-Length': Buffer.byteLength(postData),
+
+	let req = http.request(
+		{
+			hostname: 'twhratsql.whq.wistron',
+			path: '/OGWeb/OGWebReport/EntryLogQueryForm.aspx',
+			method: 'POST',
+			headers: {
+				'User-Agent':
+					'Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 10.0; WOW64; Trident/7.0; .NET4.0C; .NET4.0E; .NET CLR 2.0.50727; .NET CLR 3.0.30729; .NET CLR 3.5.30729; MAARJS)', // mimic IE 11 // important
+				'X-MicrosoftAjax': 'Delta=true', // important
+				Cookie: `ASP.NET_SessionId=${_ASPNET_SessionId}; OGWeb=${OGWeb}`, // important
+				'Content-Type': 'application/x-www-form-urlencoded',
+				'Content-Length': Buffer.byteLength(postData),
+			},
 		},
-	}
-	let req = http.request(option, callback)
+		callback
+	)
 
 	req.on('error', (e) => {
 		console.error(`Step4 Problem: ${e.message}`)
@@ -350,76 +351,81 @@ function parseKQ(html) {
 
 	// Print 刷卡 data
 	console.log(`/Department  /EID  /Name  /Clock Time`)
-	let n1 // 存放上一条数据信息，判断是否相同
 	while (true) {
 		let rex = new RegExp(
 			'<td>(.*?)</td><td>&nbsp;</td><td><.*?>(.*?)</a></td><td>(.*?)</td><td>.*?</td><td>(.*?)</td>',
 			'g'
 		) // NOTE: 'g' is important
-		let m = rex.exec(html) // 获取当前数据的信息
-		let n = _dataStackOfDateTime.pop() || undefined // 从栈中获取数据
+		let m = rex.exec(html)
 		if (m) {
-			let time1 = moment(m[4], 'M/D/YYYY H:mm:ss')
-			let dateArr = time1.toArray()
-			let date = `${dateArr[0]}-${dateArr[1] + 1}-${dateArr[2]}`
-			let arriveCom = `08:50:00`
-			let leavearriveCom = `16:50:00`
-			let t1 = moment(`${date} ${arriveCom}`, 'YYYY/MM/D H:mm:ss') // 上班时间
-			let t2 = moment(`${date} ${leavearriveCom}`, 'YYYY/MM/D H:mm:ss') // 下班时间
-			if (n) {
-				let time2 = moment(n[4], 'M/D/YYYY H:mm:ss')
-				if (time2.isSame(time1, 'days')) {
-					if (time2.diff(time1, 'hours') < 9) {
-						m.push('工时不足')
-					}
-				} else {
-					m.push('昨天只刷了一次卡')
-				}
-				if (n1) {
-					let time3 = moment(n1[4], 'M/D/YYYY H:mm:ss')
-					if (time3.diff(time1, 'hours') < 1) {
-						m.pop()
-						m.push('重复打卡')
-						_dataStackOfDateTime.push(n)
-					}
-				}
-			} else {
-				if (n1) {
-					let time3 = moment(n1[4], 'M/D/YYYY H:mm:ss')
-					if (time3.diff(time1, 'hours') < 1) {
-						m.push('重复打卡')
-					} else if (time1.diff(t2, 'minutes') > 0) {
-						_dataStackOfDateTime.push(m)
-					}
-				}
+			let time1 = moment(m[4], 'M/D/YYYY HH:mm:ss')
+			let str = `${m[1]} ${m[2]} ${m[3]}`
+			let date1 = `${time1.year()}-${time1.month() + 1}-${time1.date()}`
+			if (!_accessDateArray[str]) {
+				_accessDateArray[str] = []
+				_accessArray.push({
+					msg: str,
+					date: [],
+				})
 			}
-			if (
-				!(time1.isBefore(t1, 'minutes') || time1.isAfter(t2, 'minutes'))
-			) {
-				if (time1.isAfter(t1, 'minutes')) {
-					m.push('今天迟到了')
-				} else if (time1.isBefore(t2, 'minutes')) {
-					m.push('今天早退了')
+			if (!_accessDateArray[str][date1]) {
+				_accessDateArray[str][date1] = {
+					dep: m[1],
+					id: m[2],
+					name: m[3],
+					time: [],
+					timeNum: 0,
+					status: '',
 				}
+				_accessArray[_accessArray.length - 1].date.push(date1)
 			}
-
-			let str = ''
-			for (let i in m) {
-				if (i > 0) {
-					str += `${m[i]} `
-				}
-			}
-			console.log(str)
+			_accessDateArray[str][date1].time.push(
+				`${time1.hour()}:${time1.minute()}:${time1.second()}`
+			)
+			_accessDateArray[str][date1].timeNum =
+				_accessDateArray[str][date1].time.length
+			// console.log(`${m[1]} ${m[2]} ${m[3]} ${m[4]}`)
 			html = html.substr(rex.lastIndex)
-			n1 = m
 		} else {
-			if (n != undefined) {
-				_dataStackOfDateTime.push(n)
-			}
 			break
 		}
 	}
 	return { curPage: curPage, numPages: numPages }
+}
+
+function analysis() {
+	console.log('All done.')
+	for (const person in _accessDateArray) {
+		for (const da in _accessDateArray[person]) {
+			let date = _accessDateArray[person][da]
+			if (date.timeNum > 2) {
+				date.status += '多次刷卡 '
+			}
+			let Etime = moment(
+				`${da} ${date.time[date.time.length - 1]}`,
+				'YYYY-M-DD H/m/s'
+			)
+			let Ltime = moment(`${da} ${date.time[0]}`, 'YYYY-M-DD H/m/s')
+			if (Ltime.diff(Etime, 'hours') < 9) {
+				date.status += '工时不足 '
+			}
+			if (
+				Ltime.isBefore(moment(`${da} 16:50:00`, 'YYYY-M-DD HH/mm/ss'))
+			) {
+				date.status += '下班早退'
+			}
+			if (Etime.isAfter(moment(`${da} 08:50:00`, 'YYYY-M-DD HH/mm/ss'))) {
+				date.status += '上班迟到'
+			}
+			if (date.status.length == 0) {
+				date.status += 'OK'
+			}
+			date.Etime = Etime.format('HH:mm:SS')
+			date.Ltime = Ltime.format('HH:mm:SS')
+		}
+	}
+	console.log(_accessArray)
+	console.log(_accessDateArray)
 }
 
 function askAll() {
@@ -432,9 +438,7 @@ function askAll() {
 						'2021-1-11',
 						'S0203002',
 						false,
-						function () {
-							console.log('All done.')
-						}
+						analysis()
 					)
 				)
 			)
