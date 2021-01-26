@@ -374,7 +374,7 @@ function parseKQ(html) {
 			if (!_accessDateArray[str][date1]) {
 				let flag = true
 				// 说明这个日期和前一日期不是同一天
-				// TODO 根据日期判断是否有缺少打卡的日期，如果有，则代表前一天直接放入，但内容的time的长度为0，则为请假
+				// 根据日期判断是否有缺少打卡的日期，如果有，则代表前一天直接放入，但内容的time的长度为0，则为请假
 				if (!yesterday) {
 					yesterday = moment(date1, dateFormat)
 				}
@@ -454,21 +454,19 @@ function analysis() {
 }
 
 function askAll() {
-	inquire('2020-12-24', '2021-1-11', 'john', false, () =>
-		inquire('2020-12-28', '2021-1-11', 'S2008001', false, () =>
-			inquire('2020-12-24', '2021-1-6', 'ANNE', false, () =>
-				inquire('2020-12-25', '2021-1-08', 'LEO MY CHEN', false, () =>
-					inquire(
-						'2021-01-7',
-						'2021-1-11',
-						'S0203002',
-						false,
-						analysis()
-					)
-				)
-			)
-		)
-	)
+	// inquire('2020-12-24', '2021-1-11', 'john', false, () =>
+	// 	inquire('2020-12-28', '2021-1-11', 'S2008001', false, () =>
+	// 		inquire('2020-12-24', '2021-1-6', 'ANNE', false, () =>
+	// inquire('2020-12-25', '2021-1-08', 'LEO MY CHEN', false, () =>
+	// inquire('2021-01-7', '2021-1-11', 'S0203002', false, analysis())
+	// )
+	// 		)
+	// 	)
+	// )
+	inquire('2020-12-24', '2021-1-2', 'S2006001', false, analysis)
+	// inquire('2020-12-25', '2021-1-08', 'LEO MY CHEN', false, () =>
+	// 	inquire('2021-01-7', '2021-1-11', 'S0203002', false, analysis())
+	// )
 }
 
 function addDate(date) {
