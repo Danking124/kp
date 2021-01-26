@@ -241,6 +241,9 @@ function inquire(beginDate, endDate, employeeIdOrName, nextPage, nextStep) {
 			let buff = Buffer.concat(chunks)
 			let html = buff.toString()
 			if (response.statusCode === 200) {
+				if (!yesterday) {
+					yesterday = moment(endDate, dateFormat)
+				}
 				let result = parseKQ(html)
 				let fo = fs.createWriteStream(
 					`tmp/step4-inquire-${employeeIdOrName}-${result.curPage}.html`
@@ -378,27 +381,26 @@ function parseKQ(html) {
 				if (!yesterday) {
 					yesterday = moment(date1, dateFormat)
 				}
+				if (yesterday.isoWeekday() > 5) {
+					const num = yesterday.isoWeekday() - 5
+					yesterday.subtract(num, 'days')
+				}
 				while (flag) {
+					_accessDateArray[str][yesterday.format(dateFormat)] = {
+						dep: m[1],
+						id: m[2],
+						name: m[3],
+						time: [],
+						timeNum: 0,
+						status: '',
+					}
+					_accessArray[_accessArray.length - 1].date.push(
+						yesterday.format(dateFormat)
+					)
 					if (yesterday.isSame(moment(date1, dateFormat))) {
-						_accessDateArray[str][date1] = {
-							dep: m[1],
-							id: m[2],
-							name: m[3],
-							time: [],
-							timeNum: 0,
-							status: '',
-						}
-						_accessArray[_accessArray.length - 1].date.push(date1)
 						flag = false
 					} else {
-						_accessDateArray[str][yesterday.format(dateFormat)] = {
-							dep: m[1],
-							id: m[2],
-							name: m[3],
-							time: [],
-							timeNum: 0,
-							status: '',
-						}
+						// 相同日期在第二次加入的时候数据被清空了，要防止数据被清理的情况发生
 					}
 					addDate(yesterday)
 				}
